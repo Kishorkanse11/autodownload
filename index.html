@@ -26,13 +26,6 @@
             width: 90%;
         }
 
-        .download-link {
-            color: #007bff;
-            text-decoration: none;
-            font-size: 1.2em;
-            cursor: pointer;
-        }
-
         .progress-bar {
             width: 100%;
             height: 20px;
@@ -40,7 +33,7 @@
             border-radius: 10px;
             margin: 20px 0;
             overflow: hidden;
-            display: none;
+            position: relative;
         }
 
         .progress {
@@ -48,75 +41,229 @@
             height: 100%;
             background-color: #4CAF50;
             transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                rgba(255,255,255,0.1) 25%,
+                rgba(255,255,255,0.2) 50%,
+                rgba(255,255,255,0.1) 75%
+            );
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .install-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            text-align: center;
+            animation: popupFade 0.3s ease-in-out;
+        }
+
+        @keyframes popupFade {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
         }
 
         .install-btn {
             background: #007bff;
             color: white;
-            padding: 15px 30px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 25px;
+            border-radius: 20px;
             cursor: pointer;
-            font-size: 18px;
-            margin: 20px 0;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .install-btn:hover {
+            transform: scale(1.05);
+            background: #0056b3;
+        }
+
+        .overlay {
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            backdrop-filter: blur(3px);
+        }
+
+        .download-status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <a class="download-link" id="downloadLink">Click to Download App</a>
-        <div class="progress-bar" id="progressBar">
-            <div class="progress" id="progress"></div>
+        <h2>App Installation</h2>
+        <div class="progress-bar">
+            <div class="progress"></div>
         </div>
-        <p id="status-text">Ready to download</p>
-        <button class="install-btn" id="installBtn">Install Now</button>
+        <p id="status-text">Starting download...</p>
+        <div class="download-status">
+            <div class="spinner"></div>
+            <p id="download-info"></p>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    
+    <div class="install-popup" id="installPopup">
+        <h3>Installation Ready</h3>
+        <p>The app has been downloaded successfully!</p>
+        <button class="install-btn" id="installButton">Install Now</button>
+        <button class="install-btn" onclick="closePopup()" style="background: #6c757d;">Cancel</button>
     </div>
 
     <script>
+        let installationInProgress = false;
         const apkFile = '12.apk'; // Replace with your APK path
 
-        function startDownload() {
-            // Show progress bar
-            document.getElementById('progressBar').style.display = 'block';
-            document.getElementById('status-text').textContent = 'Downloading...';
-            
-            // Simulate download progress
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 10;
-                document.getElementById('progress').style.width = progress + '%';
-                
-                if(progress >= 100) {
-                    clearInterval(progressInterval);
-                    showInstallButton();
-                }
-            }, 300);
+        // Prevent page exit during installation
+        window.onbeforeunload = function(e) {
+            if(installationInProgress) {
+                e.preventDefault();
+                e.returnValue = 'Installation in progress. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
 
-            // Actual download
-            const link = document.createElement('a');
-            link.href = apkFile;
-            link.download = true;
-            link.click();
-        }
-
-        function showInstallButton() {
-            document.getElementById('installBtn').style.display = 'inline-block';
-            document.getElementById('status-text').textContent = 'Download complete!';
-        }
-
-        function attemptInstall() {
+        async function startDownload() {
             try {
-                // Try Android package installer
-                window.location.href = `intent://${apkFile}#Intent;action=android.intent.action.VIEW;type=application/vnd.android.package-archive;end`;
-            } catch(e) {
-                alert('Please install manually from your downloads folder');
+                installationInProgress = true;
+                const link = document.createElement('a');
+                link.href = apkFile;
+                link.download = true;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                await simulateProgress();
+                showInstallPopup();
+            } catch (error) {
+                showError('Download failed. Please try again.');
+                installationInProgress = false;
             }
         }
 
-        // Event listeners
-        document.getElementById('downloadLink').addEventListener('click', startDownload);
-        document.getElementById('installBtn').addEventListener('click', attemptInstall);
+        function simulateProgress() {
+            return new Promise((resolve) => {
+                let progress = 0;
+                const progressBar = document.querySelector('.progress');
+                const statusText = document.getElementById('status-text');
+                const downloadInfo = document.getElementById('download-info');
+                
+                const interval = setInterval(() => {
+                    if(progress >= 100) {
+                        clearInterval(interval);
+                        resolve();
+                        return;
+                    }
+                    
+                    progress += 2;
+                    progressBar.style.width = progress + '%';
+                    statusText.textContent = `Downloading... ${progress}%`;
+                    downloadInfo.textContent = `Downloading application files (${progress}%)`;
+                }, 100);
+            });
+        }
+
+        function showInstallPopup() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('installPopup').style.display = 'block';
+            document.getElementById('status-text').textContent = 'Download complete!';
+            document.getElementById('download-info').textContent = 'Ready to install';
+        }
+
+        function closePopup() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('installPopup').style.display = 'none';
+            installationInProgress = false;
+        }
+
+        async function attemptInstall() {
+            try {
+                // Try Android Intent method first
+                window.location.href = `intent://${apkFile}#Intent;action=android.intent.action.VIEW;type=application/vnd.android.package-archive;end`;
+                
+                // Fallback to direct download if intent fails
+                setTimeout(() => {
+                    window.open(apkFile, '_blank');
+                }, 500);
+                
+                installationInProgress = false;
+            } catch (error) {
+                showManualInstructions();
+            }
+        }
+
+        function showManualInstructions() {
+            const container = document.querySelector('.container');
+            container.innerHTML += `
+                <div id="manual-install" style="margin-top: 20px;">
+                    <p>Manual Installation Guide:</p>
+                    <ol style="text-align: left;">
+                        <li>Open your device's File Manager</li>
+                        <li>Navigate to Downloads folder</li>
+                        <li>Tap on "${apkFile}"</li>
+                        <li>Follow the installation prompts</li>
+                    </ol>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            document.getElementById('status-text').textContent = message;
+            document.getElementById('status-text').style.color = '#dc3545';
+            document.getElementById('download-info').textContent = 'Error occurred';
+        }
+
+        // Initialize
+        window.onload = startDownload;
+        document.getElementById('installButton').addEventListener('click', attemptInstall);
     </script>
 </body>
 </html>
