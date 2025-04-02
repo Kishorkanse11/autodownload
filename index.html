@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APK Auto Installer</title>
+    <title>APK Installer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,7 +33,6 @@
             border-radius: 10px;
             margin: 20px 0;
             overflow: hidden;
-            display: none;
         }
 
         .progress {
@@ -43,87 +42,123 @@
             transition: width 0.3s ease;
         }
 
+        .install-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+        }
+
         .install-btn {
             background: #007bff;
             color: white;
-            padding: 15px 30px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 25px;
+            border-radius: 20px;
             cursor: pointer;
-            font-size: 18px;
-            margin: 20px 0;
+            font-size: 16px;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+
+        .install-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .overlay {
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>App Installation</h2>
-        
         <div class="progress-bar">
             <div class="progress"></div>
         </div>
+        <p id="status-text">Downloading application...</p>
+    </div>
 
-        <p id="status-text">Starting installation process...</p>
-        
-        <button class="install-btn" onclick="triggerInstall()">Install Now</button>
-        
-        <div id="manual-install" style="display: none;">
-            <p>If installation didn't start automatically:</p>
-            <ol>
-                <li>Open your Downloads folder</li>
-                <li>Tap the APK file</li>
-                <li>Follow on-screen instructions</li>
-            </ol>
-        </div>
+    <div class="overlay" id="overlay"></div>
+    <div class="install-popup" id="installPopup">
+        <h3>Install Ready</h3>
+        <p>The application has been downloaded successfully!</p>
+        <button class="install-btn" onclick="attemptInstall()">Install Now</button>
+        <button class="install-btn" onclick="closePopup()" style="background: #6c757d;">Close</button>
     </div>
 
     <script>
-        let apkFile = '12.apk'; // Replace with your APK path
+        const apkFile = '12.apk'; // Replace with your APK path
         
         function simulateProgress() {
             const progressBar = document.querySelector('.progress');
-            const progressContainer = document.querySelector('.progress-bar');
+            const statusText = document.getElementById('status-text');
             let width = 0;
-            
-            progressContainer.style.display = 'block';
-            
+
             const interval = setInterval(() => {
                 if(width >= 100) {
                     clearInterval(interval);
-                    showInstallButton();
+                    showInstallPopup();
                     return;
                 }
                 width += 10;
                 progressBar.style.width = width + '%';
+                statusText.textContent = `Downloading... ${width}%`;
             }, 300);
         }
 
-        function showInstallButton() {
-            document.querySelector('.progress-bar').style.display = 'none';
-            document.querySelector('.install-btn').style.display = 'inline-block';
-            document.getElementById('status-text').textContent = 'Ready to install!';
+        function showInstallPopup() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('installPopup').style.display = 'block';
+            document.getElementById('status-text').textContent = 'Download complete!';
         }
 
-        function triggerInstall() {
-            // Try to launch package installer
+        function closePopup() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('installPopup').style.display = 'none';
+        }
+
+        function attemptInstall() {
+            closePopup();
             try {
+                // Try to launch package installer
                 window.location.href = `intent://${apkFile}#Intent;action=android.intent.action.VIEW;type=application/vnd.android.package-archive;end`;
             } catch(e) {
                 showManualInstructions();
             }
-            
-            // Fallback after 2 seconds
-            setTimeout(showManualInstructions, 2000);
         }
 
         function showManualInstructions() {
-            document.getElementById('manual-install').style.display = 'block';
+            const container = document.querySelector('.container');
+            container.innerHTML += `
+                <div id="manual-install" style="margin-top: 20px;">
+                    <p>To install manually:</p>
+                    <ol>
+                        <li>Open your device's Files/Downloads app</li>
+                        <li>Locate "${apkFile}"</li>
+                        <li>Tap the file and follow instructions</li>
+                        <li>Enable "Unknown Sources" if needed</li>
+                    </ol>
+                </div>
+            `;
         }
 
-        // Start process
+        // Start download process
         window.onload = function() {
-            // Start download
             const link = document.createElement('a');
             link.href = apkFile;
             link.download = true;
@@ -131,7 +166,6 @@
             link.click();
             document.body.removeChild(link);
             
-            // Start fake progress
             simulateProgress();
         };
     </script>
